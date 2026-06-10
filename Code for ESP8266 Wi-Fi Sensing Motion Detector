@@ -1,0 +1,75 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+
+const char* ssid = "your name of router";
+const char* password = "your router password";
+
+ESP8266WebServer server(80);
+
+#define LED_PIN D2
+
+int baselineRSSI = 0;
+String statusText = "No Motion";
+
+void handleRoot() {
+  int rssi = WiFi.RSSI();
+
+  if (abs(rssi - baselineRSSI) > 5) {
+    statusText = "MOTION DETECTED";
+    digitalWrite(LED_PIN, HIGH);
+  } else {
+    statusText = "No Motion";
+    digitalWrite(LED_PIN, LOW);
+  }
+
+  baselineRSSI = (baselineRSSI * 9 + rssi) / 10;
+
+  String page =
+    "<!DOCTYPE html><html><head>"
+    "<meta http-equiv='refresh' content='1'>"
+    "<title>ESP8266 WiFi Sensing</title>"
+    "<style>"
+    "body{font-family:Arial;text-align:center;margin-top:50px;}"
+    ".box{padding:20px;border:1px solid #ccc;display:inline-block;}"
+    "</style></head><body>"
+    "<div class='box'>"
+    "<h1>ESP8266 WiFi Sensing</h1>"
+    "<h2>RSSI: " + String(rssi) + " dBm</h2>"
+    "<h2>Status: " + statusText + "</h2>"
+    "</div></body></html>";
+
+  server.send(200, "text/html", page);
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, LOW);
+
+  WiFi.begin(ssid, password);
+
+  Serial.println("Connecting to WiFi...");
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("");
+  Serial.println("Connected!");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
+
+  delay(5000);
+  baselineRSSI = WiFi.RSSI();
+
+  server.on("/", handleRoot);
+  server.begin();
+
+  Serial.println("Web Server Started");
+}
+
+void loop() {
+  server.handleClient();
+}
